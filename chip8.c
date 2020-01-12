@@ -29,7 +29,13 @@ int main(int argc, char **argv) {
     uint8_t *program = memory + 0x200;
     fread(program, size, sizeof (uint8_t), ROM);
 
-    printf("Memory at 0x200-201: 0x%02X%02X\n", memory[0x200], memory[0x201]);
+    fclose(ROM);
+
+    /* Initialize CPU */
+    CPU cpu;
+    init_cpu(&cpu);
+
+    printf("Memory at 0x200 is 0x%04x\n", read_instruction(&cpu, memory));
 
     return 0;
 }

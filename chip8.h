@@ -13,3 +13,7 @@ typedef struct {
 } CPU;
 
 #define MEMORY_SIZE 0x1000
+
+uint16_t read_instruction(CPU *cpu, uint8_t *memory);
+
+void init_cpu(CPU *cpu);
