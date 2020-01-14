@@ -35,7 +35,10 @@ int main(int argc, char **argv) {
     CPU cpu;
     init_cpu(&cpu);
 
-    printf("Memory at 0x200 is 0x%04x\n", read_instruction(&cpu, memory));
+    // Test that memory loaded correctly
+    for (int i = 0x200; i < 0x200 + 20; i += 2) {
+        printf("Memory at 0x%03x is 0x%04x\n", i, fetch_instruction(i, memory));
+    }
 
     return 0;
 }
