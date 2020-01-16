@@ -18,7 +18,7 @@ void print_display(uint8_t *display) {
 }
 
 int main(int argc, char **argv) {
-    uint8_t *memory = malloc(MEMORY_SIZE * sizeof memory);
+    uint8_t *memory = calloc(MEMORY_SIZE, sizeof memory);
     
     printf("CHIP-8 Interpreter\n");
     if (argc != 2) {
