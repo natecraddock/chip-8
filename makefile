@@ -2,15 +2,16 @@ CC = gcc
 CFLAGS = -g -Wall
 FILES = chip8.c cpu.c
 OBJECTS = chip8.o cpu.o
+TARGET = chip8
+
+all: $(TARGET)
+
+chip8.o: chip8.c chip8.h
+
+cpu.o: cpu.c chip8.h
 
 chip8: chip8.o cpu.o
-	$(CC) $(CFLAGS) -o chip8 $(OBJECTS)
-
-chip8.o:
-	$(CC) $(CFLAGS) -c chip8.c
-
-cpu.o:
-	$(CC) $(CFLAGS) -c cpu.c
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJECTS)
 
 clean:
-	rm -f chip8 *.o
+	rm -f $(TARGET) *.o
