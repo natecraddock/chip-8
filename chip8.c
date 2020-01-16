@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
 
     while (1) {
         emulate_chip8(&cpu, memory);
-        // print_display(memory + 0xF00);
+        print_display(memory + 0xF00);
     }
 
     free(memory);
@@ -63,7 +63,7 @@ uint16_t sp = 0xEA0;
 
 void unknown_opcode(uint16_t opcode) {
     fprintf(stderr, "Unknown opcode %04x\n", opcode);
-    exit(1);
+    // exit(1);
 }
 
 void call_stack_push(uint8_t *memory, uint16_t retaddr) {
@@ -94,13 +94,13 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
         case 0x0000:
             switch (opcode) {
                 case 0x00E0:
-                    /* Clear Screen */
+                    /* [00E0] Clear Screen */
                     for (int i = 0xF00; i < 0x1000; ++i) {
                         memory[i] = 0;
                     }
                     break;
                 case 0x00EE:
-                    /* Return from a subroutine */
+                    /* [00EE] Return from a subroutine */
                     cpu->pc = call_stack_pop(memory);
                     break;
                 default:
@@ -109,16 +109,16 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
             }
             break;
         case 0x1000:
-            /* Jump to address */
+            /* [1NNN] Jump to address */
             cpu->pc = opcode & 0x0FFF;
             break;
         case 0x2000:
-            /* Call subroutine */
+            /* [2NNN] Call subroutine */
             call_stack_push(memory, cpu->pc);
             cpu->pc = opcode & 0x0FFF;
             break;
         case 0x3000: {
-            /* Skip next instruction if VX equals value */
+            /* [3XNN] Skip next instruction if VX equals value */
             uint8_t value = opcode & 0x00FF;
             uint8_t x = (opcode & 0x0F00) >> 8;
 
@@ -129,7 +129,7 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
             break;
         }
         case 0x4000: {
-            /* Skip next instruction if VX does not equal value */
+            /* [4XNN] Skip next instruction if VX does not equal value */
             uint8_t value = opcode & 0x00FF;
             uint8_t x = (opcode & 0x0F00) >> 8;
 
@@ -140,7 +140,7 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
             break;
         }
         case 0x5000: {
-            /* Skip next instruction if VX == VY */
+            /* [5XYN] Skip next instruction if VX == VY */
             uint8_t x = (opcode & 0x0F00) >> 8;
             uint8_t y = (opcode & 0x00F0) >> 4;
 
@@ -151,36 +151,36 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
             break;
         }
         case 0x6000:
-            /* Set VX to Value */
+            /* [6XNN] Set VX to Value */
             cpu->v[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
             break;
         case 0x7000:
-            /* Add value to VX */
+            /* [7XNN] Add value to VX */
             cpu->v[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
             break;
         case 0x8000: {
-            /* Arithmetic Operators */
+            /* [8000] Arithmetic Operators */
             uint8_t x = (opcode & 0x0F00) >> 8;
             uint8_t y = (opcode & 0x00F0) >> 4;
             switch (opcode & 0x000F) {
                 case 0x0000:
-                    /* Assign VX to value of VY */
+                    /* [8XY0] Assign VX to value of VY */
                     cpu->v[x] = cpu->v[y];
                     break;
                 case 0x0001:
-                    /* VX = VX | VY */
+                    /* [8XY1] VX = VX | VY */
                     cpu->v[x] = cpu->v[x] | cpu->v[y];
                     break;
                 case 0x0002:
-                    /* VX = VX & VY */
+                    /* [8XY2] VX = VX & VY */
                     cpu->v[x] = cpu->v[x] & cpu->v[y];
                     break;
                 case 0x0003:
-                    /* VX = VX ^ VY */
+                    /* [8XY3] VX = VX ^ VY */
                     cpu->v[x] = cpu->v[x] ^ cpu->v[y];
                     break;
                 case 0x0004:
-                    /* VX += VY */
+                    /* [8XY4] VX += VY */
                     if ((cpu->v[x] + cpu->v[y]) & 0x0F00) {
                         cpu->v[0xF] = 1;
                     }
@@ -191,12 +191,36 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
                     cpu->v[x] += cpu->v[y];
                     break;
                 case 0x0005:
+                    /* [8XY5] VX -= VY */
+                    if (cpu->v[x] < cpu->v[y]) {
+                        cpu->v[0xF] = 0;
+                    }
+                    else {
+                        cpu->v[0xF] = 1;
+                    }
+
+                    cpu->v[x] -= cpu->v[y];
                     break;
                 case 0x0006:
+                    /* [8XY6] VX >>= 1 */
+                    cpu->v[0xF] = cpu->v[x] & 0x1;
+                    cpu->v[x] >>= 1;
                     break;
                 case 0x0007:
+                    /* [8XY7] VX = VY - VX */
+                    if (cpu->v[y] < cpu->v[x]) {
+                        cpu->v[0xF] = 0;
+                    }
+                    else {
+                        cpu->v[0xF] = 1;
+                    }
+
+                    cpu->v[x] = cpu->v[y] - cpu->v[x];
                     break;
                 case 0x000E:
+                    /* [8XYE] VX <<= 1 */
+                    cpu->v[0xF] = cpu->v[x] & 0xF;
+                    cpu->v[0xF] <<= 1;
                     break;
                 default:
                     unknown_opcode(opcode);
@@ -253,8 +277,48 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
         }
         // case 0xE000:
         //     break;
-        // case 0xF000:
-        //     break;
+        case 0xF000: {
+            uint8_t x = (opcode & 0x0F00) >> 8;
+            switch (opcode & 0x00FF) {
+                case 0x0007:
+                    /* [FX07] VX = delay_timer */
+                    break;
+                case 0x000A:
+                    /* [FX0A] VX = get_key (blocking) */
+                    break;
+                case 0x0015:
+                    /* [FX15] delay_timer = VX */
+                    break;
+                case 0x0018:
+                    /* [FX18] sound_timer = VX */
+                    break;
+                case 0x001E:
+                    /* [FX1E] I += VX */
+                    break;
+                case 0x0029:
+                    /* [FX29] I = sprite_address[VX] (chars) */
+                    break;
+                case 0x0033:
+                    /* [FX33] binary coded decimal */
+                    break;
+                case 0x0055:
+                    /* [FX55] register dump at I */
+                    for (int i = 0; i <= x; ++i) {
+                        memory[cpu->i + i] = cpu->v[i];
+                    }
+                    break;
+                case 0x0065:
+                    /* [FX65] register load at I */
+                    for (int i = 0; i <= x; ++i) {
+                        cpu->v[i] = memory[cpu->i + i];
+                    }
+                    break;
+                default:
+                    unknown_opcode(opcode);
+                    break;
+            }
+            break;
+        }
         default:
             unknown_opcode(opcode);
             break;
