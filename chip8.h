@@ -14,6 +14,6 @@ typedef struct {
 
 #define MEMORY_SIZE 0x1000
 
-uint16_t fetch_instruction(uint16_t address, uint8_t *memory);
+uint16_t fetch_instruction(CPU *cpu, uint8_t *memory);
 
 void init_cpu(CPU *cpu);
