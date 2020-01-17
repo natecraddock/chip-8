@@ -312,6 +312,9 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
                     break;
                 case 0x0033:
                     /* [FX33] binary coded decimal */
+                    memory[cpu->i] = x / 100;
+                    memory[cpu->i + 1] = (x % 100) / 10;
+                    memory[cpu->i + 2] = (x % 100) % 10;
                     break;
                 case 0x0055:
                     /* [FX55] register dump at I */
