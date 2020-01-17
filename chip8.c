@@ -245,8 +245,12 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
             /* [BNNN] Jump to address NNN + V0 */
             cpu->pc = (opcode & 0x0FFF) + cpu->v[0];
             break;
-        // case 0xC000:
-        //     break;
+        case 0xC000: {
+            /* [CXNN] VX = rand() & NN */
+            uint8_t x = cpu->v[(opcode & 0x0F00) >> 8];
+            cpu->v[x] = (rand() % 0x100) & opcode & 0x00FF;
+            break;
+        }
         case 0xD000: {
             /* [DXYN] Draw sprite on screen */
             uint8_t x = cpu->v[(opcode & 0x0F00) >> 8];
@@ -294,6 +298,14 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
                     break;
                 case 0x001E:
                     /* [FX1E] I += VX */
+                    if (cpu->i + cpu->v[x] > 0xFFF) {
+                        cpu->v[0xF] = 1;
+                    }
+                    else {
+                        cpu->v[0xF] = 1;
+                    }
+
+                    cpu->i += cpu->v[x];
                     break;
                 case 0x0029:
                     /* [FX29] I = sprite_address[VX] (chars) */
