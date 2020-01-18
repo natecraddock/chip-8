@@ -11,7 +11,7 @@ chip8.o: chip8.c chip8.h
 cpu.o: cpu.c chip8.h
 
 chip8: chip8.o cpu.o
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJECTS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJECTS) -lSDL2
 
 clean:
 	rm -f $(TARGET) *.o

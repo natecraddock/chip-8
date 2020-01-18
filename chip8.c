@@ -5,7 +5,9 @@
 
 #include "chip8.h"
 
-void emulate_chip8(CPU *cpu, uint8_t *memory);
+#include "SDL2/SDL.h"
+
+void emulate_chip8(CPU *cpu, uint8_t *memory, Keyboard *keyboard);
 
 void print_display(uint8_t *display) {
     for (int i = 0; i < 256; ++i) {
@@ -17,6 +19,65 @@ void print_display(uint8_t *display) {
     printf("\n");
 }
 
+void set_keys(Keyboard *keyboard, int key) {
+    for (int i = 0; i <= 0xF; ++i) {
+        keyboard->keys[i] = 0;
+    }
+
+    switch (key) {
+        case SDLK_1:
+            keyboard->keys[0x1] = 1;
+            break;
+        case SDLK_2:
+            keyboard->keys[0x2] = 1;
+            break;
+        case SDLK_3:
+            keyboard->keys[0x3] = 1;
+            break;
+        case SDLK_q:
+            keyboard->keys[0x4] = 1;
+            break;
+        case SDLK_w:
+            keyboard->keys[0x5] = 1;
+            break;
+        case SDLK_e:
+            keyboard->keys[0x6] = 1;
+            break;
+        case SDLK_a:
+            keyboard->keys[0x7] = 1;
+            break;
+        case SDLK_s:
+            keyboard->keys[0x8] = 1;
+            break;
+        case SDLK_d:
+            keyboard->keys[0x9] = 1;
+            break;
+        case SDLK_x:
+            keyboard->keys[0x0] = 1;
+            break;
+        case SDLK_z:
+            keyboard->keys[0xA] = 1;
+            break;
+        case SDLK_c:
+            keyboard->keys[0xB] = 1;
+            break;
+        case SDLK_4:
+            keyboard->keys[0xC] = 1;
+            break;
+        case SDLK_r:
+            keyboard->keys[0xD] = 1;
+            break;
+        case SDLK_f:
+            keyboard->keys[0xE] = 1;
+            break;
+        case SDLK_v:
+            keyboard->keys[0xF] = 1;
+            break;
+        default:
+            break;
+    }
+}
+
 int main(int argc, char **argv) {
     uint8_t *memory = calloc(MEMORY_SIZE, sizeof memory);
     
@@ -24,6 +85,18 @@ int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "Usage: chip8 [ROM]\n");
         return 1;
+    }
+
+    /* Init SDL 2 */
+    if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) != 0) {
+        fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    SDL_Window *window = SDL_CreateWindow("CHIP-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_SHOWN);
+
+    if (!window) {
+        fprintf(stderr, "Unable to create window\n");
     }
     
     /* Load ROM into memory */
@@ -49,8 +122,34 @@ int main(int argc, char **argv) {
     init_cpu(&cpu);
 
     while (1) {
-        emulate_chip8(&cpu, memory);
-        print_display(memory + 0xF00);
+        SDL_Event event;
+        Keyboard keyboard;
+
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_KEYDOWN) {
+                printf("Key pressed");
+
+                int key = event.key.keysym.sym;
+                if (key == SDLK_ESCAPE) {
+                    SDL_Quit();
+                    free(memory);
+                    return 0;
+                }
+                else {
+                    /* Handle key presses */
+                    set_keys(&keyboard, key);
+                }
+            }
+
+            if (event.type == SDL_QUIT) {
+                SDL_Quit();
+                free(memory);
+                return 0;
+            }
+        }
+        emulate_chip8(&cpu, memory, &keyboard);
+        sleep(1);
+        // print_display(memory + 0xF00);
     }
 
     free(memory);
@@ -63,7 +162,7 @@ uint16_t sp = 0xEA0;
 
 void unknown_opcode(uint16_t opcode) {
     fprintf(stderr, "Unknown opcode %04x\n", opcode);
-    // exit(1);
+    exit(1);
 }
 
 void call_stack_push(uint8_t *memory, uint16_t retaddr) {
@@ -80,8 +179,7 @@ uint16_t call_stack_pop(uint8_t *memory) {
     return (memory[sp] << 8) | memory[sp + 1];
 }
 
-void emulate_chip8(CPU *cpu, uint8_t *memory) {
-    sleep(1);
+void emulate_chip8(CPU *cpu, uint8_t *memory, Keyboard *keyboard) {
     /* Fetch instruction */
     printf("address: %04x  ", cpu->pc);
     uint16_t opcode = fetch_instruction(cpu, memory);
@@ -279,8 +377,28 @@ void emulate_chip8(CPU *cpu, uint8_t *memory) {
             }
             break;
         }
-        // case 0xE000:
-        //     break;
+        case 0xE000: {
+            uint8_t x = (opcode & 0x0F00) >> 8;
+            /* Keyboard input */
+            switch (opcode & 0x00FF) {
+                case 0x009E:
+                    /* [EX9E] skip if key pressed */
+                    if (keyboard->keys[x]) {
+                        cpu->pc += 2;
+                    }
+                    break;
+                case 0x00A1:
+                    /* [EXA1] skip if key not pressed */
+                    if (!keyboard->keys[x]) {
+                        cpu->pc += 2;
+                    }
+                    break;
+                default:
+                    unknown_opcode(opcode);
+                    break;
+            }
+            break;
+        }
         case 0xF000: {
             uint8_t x = (opcode & 0x0F00) >> 8;
             switch (opcode & 0x00FF) {
