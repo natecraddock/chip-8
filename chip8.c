@@ -9,16 +9,6 @@
 
 void emulate_chip8(CPU *cpu, uint8_t *memory, Keyboard *keyboard);
 
-void print_display(uint8_t *display) {
-    for (int i = 0; i < 256; ++i) {
-        if (i % 8 == 0) {
-            printf("\n");
-        }
-        printf("%02x  ", display[i]);
-    }
-    printf("\n");
-}
-
 void set_keys(Keyboard *keyboard, int key) {
     for (int i = 0; i <= 0xF; ++i) {
         keyboard->keys[i] = 0;
@@ -78,6 +68,35 @@ void set_keys(Keyboard *keyboard, int key) {
     }
 }
 
+/* Load font data into memory */
+void load_font_data(uint8_t *memory) {
+
+}
+
+void draw_square(int x, int y, SDL_Surface *surface) {
+    SDL_Rect rect = {x, y, 10, 10};
+
+    SDL_FillRect(surface, &rect, SDL_MapRGB(surface->format, 255, 255, 255));
+}
+
+void draw_display(uint8_t *display, SDL_Surface* surface) {
+    int width = 8;
+    int height = 32;
+
+    /* Draw display from memory */
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            uint8_t row = display[x + (y * width)];
+            for (int i = 0; i < 8; ++i) {
+                if (row & (0x80 >> i)) {
+                    /* This pixel is set, draw a 10x10 square */
+                    draw_square(((x * 8) + i) * 10, y * 10, surface);
+                }
+            }
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     uint8_t *memory = calloc(MEMORY_SIZE, sizeof memory);
     
@@ -88,7 +107,7 @@ int main(int argc, char **argv) {
     }
 
     /* Init SDL 2 */
-    if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
         return 1;
     }
@@ -97,6 +116,14 @@ int main(int argc, char **argv) {
 
     if (!window) {
         fprintf(stderr, "Unable to create window\n");
+        return 1;
+    }
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+
+    if (!renderer) {
+        fprintf(stderr, "Unable to create renderer\n");
+        return 1;
     }
     
     /* Load ROM into memory */
@@ -125,6 +152,16 @@ int main(int argc, char **argv) {
         SDL_Event event;
         Keyboard keyboard;
 
+        // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+        // SDL_RenderClear(renderer);
+        SDL_Surface *surface = SDL_GetWindowSurface(window);
+
+        /* Clear */
+        SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0, 0, 0));
+        draw_display(memory + 0xF00, surface);
+        SDL_UpdateWindowSurface(window);
+        // SDL_RenderPresent(renderer);
+
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_KEYDOWN) {
                 printf("Key pressed");
@@ -132,6 +169,8 @@ int main(int argc, char **argv) {
                 int key = event.key.keysym.sym;
                 if (key == SDLK_ESCAPE) {
                     SDL_Quit();
+                    SDL_DestroyRenderer(renderer);
+                    SDL_DestroyWindow(window);
                     free(memory);
                     return 0;
                 }
@@ -143,13 +182,14 @@ int main(int argc, char **argv) {
 
             if (event.type == SDL_QUIT) {
                 SDL_Quit();
+                SDL_DestroyRenderer(renderer);
+                SDL_DestroyWindow(window);
                 free(memory);
                 return 0;
             }
         }
         emulate_chip8(&cpu, memory, &keyboard);
-        sleep(1);
-        // print_display(memory + 0xF00);
+        // sleep(1);
     }
 
     free(memory);
