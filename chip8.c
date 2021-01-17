@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 #include "chip8.h"
 
@@ -68,15 +70,60 @@ void set_keys(Keyboard *keyboard, int key) {
     }
 }
 
+uint8_t wait_for_keypress(Keyboard *keyboard) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_KEYDOWN) {
+            int key = event.key.keysym.sym;
+            set_keys(keyboard, key);
+        }
+    }
+    for (int i = 0; i <= 0xF; ++i) {
+        if (keyboard->keys[i]) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 /* Load font data into memory */
 void load_font_data(uint8_t *memory) {
+    uint8_t chip8_fontset[80] = { 
+        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+        0x20, 0x60, 0x20, 0x20, 0x70, // 1
+        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+        0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+    };
 
+    for (int i = 0; i < sizeof chip8_fontset / sizeof (uint8_t); ++i) {
+        memory[i] = chip8_fontset[i];
+    }
 }
+
+
 
 void draw_square(int x, int y, SDL_Surface *surface) {
     SDL_Rect rect = {x, y, 10, 10};
 
     SDL_FillRect(surface, &rect, SDL_MapRGB(surface->format, 255, 255, 255));
+}
+
+uint64_t get_time_milis() {
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    return (1000 * time.tv_sec) + (time.tv_usec / 1000.0);
 }
 
 void draw_display(uint8_t *display, SDL_Surface* surface) {
@@ -99,6 +146,9 @@ void draw_display(uint8_t *display, SDL_Surface* surface) {
 
 int main(int argc, char **argv) {
     uint8_t *memory = calloc(MEMORY_SIZE, sizeof memory);
+    if (!memory) {
+        fprintf(stderr, "Failed to allocate memory\n");
+    }
     
     printf("CHIP-8 Interpreter\n");
     if (argc != 2) {
@@ -144,10 +194,13 @@ int main(int argc, char **argv) {
 
     fclose(ROM);
 
+    load_font_data(memory);
+
     /* Initialize CPU */
     CPU cpu;
     init_cpu(&cpu);
 
+    uint64_t hertz = get_time_milis();
     while (1) {
         SDL_Event event;
         Keyboard keyboard;
@@ -164,7 +217,7 @@ int main(int argc, char **argv) {
 
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_KEYDOWN) {
-                printf("Key pressed");
+                // printf("Key pressed");
 
                 int key = event.key.keysym.sym;
                 if (key == SDLK_ESCAPE) {
@@ -189,7 +242,17 @@ int main(int argc, char **argv) {
             }
         }
         emulate_chip8(&cpu, memory, &keyboard);
-        // sleep(1);
+
+        if (get_time_milis() - hertz > 16.6667) {
+            if (cpu.delay_timer > 0) {
+                cpu.delay_timer -= 1;
+            }
+            if (cpu.sound_timer > 0) {
+                cpu.sound_timer -= 1;
+            }
+        }
+
+        usleep(10000);
     }
 
     free(memory);
@@ -221,9 +284,9 @@ uint16_t call_stack_pop(uint8_t *memory) {
 
 void emulate_chip8(CPU *cpu, uint8_t *memory, Keyboard *keyboard) {
     /* Fetch instruction */
-    printf("address: %04x  ", cpu->pc);
+    // printf("address: %04x  ", cpu->pc);
     uint16_t opcode = fetch_instruction(cpu, memory);
-    printf("opcode: %04x\n", opcode);
+    // printf("opcode: %04x\n", opcode);
 
     uint8_t *display = memory + 0xF00;
 
@@ -357,8 +420,8 @@ void emulate_chip8(CPU *cpu, uint8_t *memory, Keyboard *keyboard) {
                     break;
                 case 0x000E:
                     /* [8XYE] VX <<= 1 */
-                    cpu->v[0xF] = cpu->v[x] & 0xF;
-                    cpu->v[0xF] <<= 1;
+                    cpu->v[0xF] = cpu->v[x] & 0x8;
+                    cpu->v[x] <<= 1;
                     break;
                 default:
                     unknown_opcode(opcode);
@@ -398,7 +461,7 @@ void emulate_chip8(CPU *cpu, uint8_t *memory, Keyboard *keyboard) {
             cpu->v[0xF] = 0;
             for (int j = 0; j < height; ++j) {
                 uint8_t line = memory[cpu->i + j];
-                printf("line=%02x\n", line);
+                // printf("line=%02x\n", line);
                 for (int i = 0; i < 8; ++i) {
 
                     if ((line << i) & 0x80) {
@@ -444,15 +507,21 @@ void emulate_chip8(CPU *cpu, uint8_t *memory, Keyboard *keyboard) {
             switch (opcode & 0x00FF) {
                 case 0x0007:
                     /* [FX07] VX = delay_timer */
+                    cpu->v[x] = cpu->delay_timer;
                     break;
-                case 0x000A:
+                case 0x000A: {
                     /* [FX0A] VX = get_key (blocking) */
+                    uint8_t key = wait_for_keypress(keyboard);
+                    cpu->v[x] = key;
                     break;
+                }
                 case 0x0015:
                     /* [FX15] delay_timer = VX */
+                    cpu->delay_timer = cpu->v[x];
                     break;
                 case 0x0018:
                     /* [FX18] sound_timer = VX */
+                    cpu->sound_timer = cpu->v[x];
                     break;
                 case 0x001E:
                     /* [FX1E] I += VX */
@@ -467,6 +536,7 @@ void emulate_chip8(CPU *cpu, uint8_t *memory, Keyboard *keyboard) {
                     break;
                 case 0x0029:
                     /* [FX29] I = sprite_address[VX] (chars) */
+                    cpu->i = cpu->v[x] * 5;
                     break;
                 case 0x0033:
                     /* [FX33] binary coded decimal */

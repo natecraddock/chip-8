@@ -10,6 +10,10 @@ typedef struct {
 
     /* Address Register */
     uint16_t i;
+
+    /* Timers */
+    uint8_t delay_timer;
+    uint8_t sound_timer;
 } CPU;
 
 typedef struct {
