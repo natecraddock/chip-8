@@ -72,16 +72,22 @@ void set_keys(Keyboard *keyboard, int key) {
 
 uint8_t wait_for_keypress(Keyboard *keyboard) {
     SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_KEYDOWN) {
-            int key = event.key.keysym.sym;
-            set_keys(keyboard, key);
+    while (1) {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_KEYDOWN) {
+                int key = event.key.keysym.sym;
+                set_keys(keyboard, key);
+            }
+            else if (event.type == SDL_QUIT) {
+                exit(1);
+            }
         }
-    }
-    for (int i = 0; i <= 0xF; ++i) {
-        if (keyboard->keys[i]) {
-            return i;
+        for (int i = 0; i <= 0xF; ++i) {
+            if (keyboard->keys[i]) {
+                return i;
+            }
         }
+        usleep(1000);
     }
     return 0;
 }
@@ -204,6 +210,9 @@ int main(int argc, char **argv) {
     while (1) {
         SDL_Event event;
         Keyboard keyboard;
+        for (int i = 0; i <= 0xF; ++i) {
+            keyboard.keys[i] = 0;
+        }
 
         // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         // SDL_RenderClear(renderer);
